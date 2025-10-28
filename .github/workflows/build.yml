@@ -18,9 +18,6 @@ jobs:
           java-version: 21
       - name: Clean Build
         run: ./gradlew clean build
-      - name: Find JAR Artifacts
-        run: |
-          echo "ARTIFACTS=$(find Core/build/libs -name '*.jar' -type f -print0 | xargs -0 echo) $(find Bukkit/build/libs -name '*.jar' -type f -print0 | xargs -0 echo)" >> $GITHUB_ENV
       - name: Set Commit ID
         run: echo "commit_id=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: Create Release and Upload JAR(s)
@@ -28,6 +25,7 @@ jobs:
         with:
           tag_name: release-${{ env.commit_id }}
           name: PlotSquared-${{ env.commit_id }}
-          files: ${{ env.ARTIFACTS }}
+          files: |
+            Bukkit/build/libs/*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
