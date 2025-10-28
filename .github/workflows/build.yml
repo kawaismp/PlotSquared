@@ -19,49 +19,16 @@ jobs:
           java-version: 21
       - name: Clean Build
         run: ./gradlew clean build
-      - name: Determine release status
-        if: ${{ runner.os == 'Linux' }}
+      - name: Find JAR Artifacts
         run: |
-          if [ "$(./gradlew properties | awk '/^version:/ { print $2; }' | grep '\-SNAPSHOT')" ]; then
-            echo "STATUS=snapshot" >> $GITHUB_ENV
-          else
-            echo "STATUS=release" >> $GITHUB_ENV
-          fi
-      - name: Publish Release
-        if: ${{ runner.os == 'Linux' && env.STATUS == 'release' && github.event_name == 'push' && github.ref == 'refs/heads/main'}}
-        run: ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache
-        env:
-          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_USERNAME }}
-          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
-          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
-      - name: Publish Snapshot
-        if: ${{ runner.os == 'Linux' && env.STATUS != 'release' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        run: ./gradlew publishAllPublicationsToMavenCentralRepository
-        env:
-          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_USERNAME }}
-          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PASSWORD }}
-      - name: Publish core javadoc
-        if: ${{ runner.os == 'Linux' && env.STATUS == 'release' && github.event_name == 'push' && github.ref == 'refs/heads/main'}}
-        uses: cpina/github-action-push-to-another-repository@main
-        env:
-          SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
+          echo "ARTIFACTS=$(find Core/build/libs -name '*.jar' -type f -print0 | xargs -0 echo) $(find Bukkit/build/libs -name '*.jar' -type f -print0 | xargs -0 echo)" >> $GITHUB_ENV
+      - name: Set Commit ID
+        run: echo "commit_id=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - name: Create Release and Upload JAR(s)
+        uses: softprops/action-gh-release@v2
         with:
-          source-directory: 'Core/build/docs/javadoc'
-          destination-github-username: 'IntellectualSites'
-          destination-repository-name: 'plotsquared-javadocs'
-          user-email: ${{ secrets.USER_EMAIL }}
-          target-branch: main
-          target-directory: v7/core
-      - name: Publish bukkit javadoc
-        if: ${{ runner.os == 'Linux' && env.STATUS == 'release' && github.event_name == 'push' && github.ref == 'refs/heads/main'}}
-        uses: cpina/github-action-push-to-another-repository@main
+          tag_name: release-${{ env.commit_id }}
+          name: PlotSquared-${{ env.commit_id }}
+          files: ${{ env.ARTIFACTS }}
         env:
-          SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
-        with:
-          source-directory: 'Bukkit/build/docs/javadoc'
-          destination-github-username: 'IntellectualSites'
-          destination-repository-name: 'plotsquared-javadocs'
-          user-email: ${{ secrets.USER_EMAIL }}
-          target-branch: main
-          target-directory: v7/bukkit
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
